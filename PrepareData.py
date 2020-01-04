@@ -11,12 +11,9 @@ from configparser import ConfigParser
 # This is a modified version of the data preparation logic from the original tutorial:
 # https://pythonprogramming.net/chatbot-deep-learning-python-tensorflow/
 #
-# The original logic processed the data in block of 1000 records, but resulted in a low match ratio.
+# The original logic processed the data in blocks of 1000 records, but resulted in a low match ratio.
 # This is because it looks-up matching parent records from the DB, but the records in the batch of 1000
 # have not been stored yet in the DB.
-#
-# There is a better and more efficient data processing logic in the BulkPrepare.py script.
-# That should be used instead.
 # ----------------------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------------------------------
@@ -32,13 +29,10 @@ MIN_SCORE = -100
 # If True, will remove all existing DB records at the start
 DELETE_EXISTING_RECORDS = False
 
-# If True, will remove all un-paired DB records at the ned
-CLEANUP_UNPAIRED_RECORDS = True
-
 # Interval to log the number of records being processed
 LOG_INTERVAL = 10000
 
-# If True, will log each DB transaction
+# If True, will log each DB transaction (used for debugging)
 LOG_DB_TRANS = False
 
 # ----------------------------------------------------------------------------------------------------
@@ -66,11 +60,8 @@ def config(filename='db.cfg', section='postgresql'):
 
 params = config()
 
-# not in video
 print('Connecting to the PostgreSQL database...')
 connection = psycopg2.connect(**params)
-# "**"= prefix operator to pass arguments into a function
-# in this case, connect expects (host, user, password, ...), and we are passing the values of the params dict
 c = connection.cursor()
 
 
@@ -145,11 +136,6 @@ def find_existing_score_for_parent(pid):
         return NULL_VAL
 
 
-def cleanup():
-    print("Cleaning up un-paired records")
-    execute_sql("DELETE FROM replies WHERE parent IS NULL")
-
-
 # ----------------------------------------------------------------------------------------------------
 # Data formatting and validation functions
 # ----------------------------------------------------------------------------------------------------
@@ -170,10 +156,10 @@ def acceptable(data):
     # Skip if >32000 characters
     elif len(data) > 32000:
         return False
-    # Skip deleted commentd
+    # Skip deleted comments
     elif data == '[deleted]':
         return False
-    # Skip removed commentd
+    # Skip removed comments
     elif data == '[removed]':
         return False
     else:
@@ -192,7 +178,6 @@ def log_data(transaction, row_counter, parent_id, comment_id, score):
 def process_file():
     row_counter = 0
     paired_rows = 0
-    # with open('J:/chatdata/reddit_data/{}/RC_{}'.format(timeframe.split('-')[0],timeframe), buffering=1000) as f:
     with open('testdata.txt', encoding="utf8") as f:
         for row in f:
             row_counter = row_counter + 1
@@ -206,10 +191,10 @@ def process_file():
                 comment_id = data['id']
                 subreddit = data['subreddit']
 
-                parent_comment = get_existing_comment_data(parent_id)
-
                 if score >= MIN_SCORE:  # Filter out comments below our min score threshold
                     if acceptable(body):  # Filter out comments that are not acceptable
+
+                        parent_comment = get_existing_comment_data(parent_id)
 
                         # Update parent if we have a better score than existing comment
                         existing_comment_score = find_existing_score_for_parent(parent_id)
@@ -234,9 +219,6 @@ def process_file():
 
             except Exception as e:
                 print(str(e))
-
-        if CLEANUP_UNPAIRED_RECORDS:
-            cleanup()  # Cleanup un-paired records
 
         print('Total Rows Read: {}, Paired: {}, Time: {}'.format(row_counter, paired_rows, str(datetime.now())))
 
