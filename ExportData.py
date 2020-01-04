@@ -33,7 +33,6 @@ def config(filename='db.cfg', section='postgresql'):
 
 params = config()
 
-# not in video
 print('Connecting to the PostgreSQL database...')
 connection = psycopg2.connect(**params)
 
